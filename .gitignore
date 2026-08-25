@@ -1,0 +1,5 @@
+/dotlink
+/dotlink-convert
+*.exe
+*.test
+*.out
