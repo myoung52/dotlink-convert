@@ -59,6 +59,6 @@ or `$HOME` - that's between you and whatever shell runs the output.
 
 ## status
 
-Early. Handles the common case with no tests yet. No support for
-directory-of-links layouts like GNU Stow uses, and no validation that
-a target actually exists on disk.
+Early. Handles the common case, with unit tests for both parsers. No
+support for directory-of-links layouts like GNU Stow uses, and no
+validation that a target actually exists on disk.
