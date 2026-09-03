@@ -54,11 +54,20 @@ flags are ignored, and whatever two path arguments are left are read
 as target and link path, in that order, matching `ln`'s own argument
 order.
 
-Paths are passed through exactly as written. Nothing here expands `~`
-or `$HOME` - that's between you and whatever shell runs the output.
+Paths are passed through exactly as written by default - that's
+between you and whatever shell runs the output. Pass `-expand` to
+have dotlink expand a leading `~` or `$HOME` itself, in both paths
+and targets:
+
+    ./dotlink to-script -expand ~/.dotlinks > setup-links.sh
+
+That's useful when the output is going somewhere that won't do the
+expansion for you, like a manifest read back in by something other
+than a shell.
 
 ## status
 
 Early. Handles the common case, with unit tests for both parsers. No
-support for directory-of-links layouts like GNU Stow uses, and no
-validation that a target actually exists on disk.
+detection of duplicate link paths, no support for directory-of-links
+layouts like GNU Stow uses, and no validation that a target actually
+exists on disk.
