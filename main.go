@@ -42,18 +42,21 @@ func main() {
 	switch cmd {
 	case "to-script":
 		links, convErr = parseManifest(in)
-		if convErr == nil {
-			if *expand {
-				expandLinks(links)
-			}
-			convErr = writeScript(os.Stdout, links)
-		}
 	case "to-manifest":
 		links, convErr = parseScript(in)
-		if convErr == nil {
-			if *expand {
-				expandLinks(links)
-			}
+	}
+
+	if convErr == nil && *expand {
+		expandLinks(links)
+	}
+	if convErr == nil {
+		convErr = duplicatePaths(links)
+	}
+	if convErr == nil {
+		switch cmd {
+		case "to-script":
+			convErr = writeScript(os.Stdout, links)
+		case "to-manifest":
 			convErr = writeManifest(os.Stdout, links)
 		}
 	}

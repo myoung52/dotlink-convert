@@ -65,9 +65,14 @@ That's useful when the output is going somewhere that won't do the
 expansion for you, like a manifest read back in by something other
 than a shell.
 
+If two entries end up with the same link path - whether that's
+written that way or only happens after `-expand` resolves `~` and
+`$HOME` to the same place - both subcommands refuse to write output
+and report every duplicated path instead of silently letting the
+last one win.
+
 ## status
 
 Early. Handles the common case, with unit tests for both parsers. No
-detection of duplicate link paths, no support for directory-of-links
-layouts like GNU Stow uses, and no validation that a target actually
-exists on disk.
+support for directory-of-links layouts like GNU Stow uses, and no
+validation that a target actually exists on disk.
