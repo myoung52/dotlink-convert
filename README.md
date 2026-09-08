@@ -40,8 +40,18 @@ Convert a script back to a manifest:
 
     ./dotlink to-manifest setup-links.sh > .dotlinks
 
-Both subcommands read from stdin when the file argument is omitted or
-is `-`, so pipelines work without a temp file:
+Check a manifest against what's actually on disk:
+
+    ./dotlink check ~/.dotlinks
+
+For each entry this reports whether the link path is missing, is a
+regular file or directory instead of a symlink, points somewhere
+other than the expected target, or is a symlink to a target that
+doesn't exist. It exits non-zero if anything is wrong. Pass
+`-format script` to check a script instead of a manifest.
+
+All three subcommands read from stdin when the file argument is
+omitted or is `-`, so pipelines work without a temp file:
 
     cat .dotlinks | ./dotlink to-script
     curl -s https://example.com/setup-links.sh | ./dotlink to-manifest
@@ -73,6 +83,6 @@ last one win.
 
 ## status
 
-Early. Handles the common case, with unit tests for both parsers. No
-support for directory-of-links layouts like GNU Stow uses, and no
-validation that a target actually exists on disk.
+Early. Handles the common case, with unit tests for both parsers and
+for `check`. No support for directory-of-links layouts like GNU Stow
+uses.

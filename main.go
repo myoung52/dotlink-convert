@@ -14,13 +14,17 @@ func main() {
 	}
 
 	cmd := os.Args[1]
-	if cmd != "to-script" && cmd != "to-manifest" {
+	if cmd != "to-script" && cmd != "to-manifest" && cmd != "check" {
 		usage()
 		os.Exit(2)
 	}
 
 	fs := flag.NewFlagSet(cmd, flag.ExitOnError)
 	expand := fs.Bool("expand", false, "expand leading ~ and $HOME in paths and targets")
+	var format *string
+	if cmd == "check" {
+		format = fs.String("format", "manifest", "input format: manifest or script")
+	}
 	fs.Usage = usage
 	fs.Parse(os.Args[2:])
 
@@ -44,6 +48,15 @@ func main() {
 		links, convErr = parseManifest(in)
 	case "to-manifest":
 		links, convErr = parseScript(in)
+	case "check":
+		switch *format {
+		case "manifest":
+			links, convErr = parseManifest(in)
+		case "script":
+			links, convErr = parseScript(in)
+		default:
+			convErr = fmt.Errorf("unknown -format %q, want manifest or script", *format)
+		}
 	}
 
 	if convErr == nil && *expand {
@@ -58,6 +71,10 @@ func main() {
 			convErr = writeScript(os.Stdout, links)
 		case "to-manifest":
 			convErr = writeManifest(os.Stdout, links)
+		case "check":
+			if !writeCheckReport(os.Stdout, checkLinks(links)) {
+				os.Exit(1)
+			}
 		}
 	}
 
@@ -87,7 +104,8 @@ func openInput(path string) (io.ReadCloser, error) {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: dotlink to-script|to-manifest [-expand] [file]")
+	fmt.Fprintln(os.Stderr, "usage: dotlink to-script|to-manifest|check [-expand] [file]")
 	fmt.Fprintln(os.Stderr, "  reads from file, or stdin if omitted or file is -")
-	fmt.Fprintln(os.Stderr, "  -expand   expand leading ~ and $HOME in paths and targets")
+	fmt.Fprintln(os.Stderr, "  -expand         expand leading ~ and $HOME in paths and targets")
+	fmt.Fprintln(os.Stderr, "  -format string  check only: input format, manifest or script (default manifest)")
 }
