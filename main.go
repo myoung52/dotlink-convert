@@ -19,12 +19,15 @@ func main() {
 		os.Exit(2)
 	}
 
+	defaultFormat := "manifest"
+	if cmd == "to-manifest" {
+		defaultFormat = "script"
+	}
+
 	fs := flag.NewFlagSet(cmd, flag.ExitOnError)
 	expand := fs.Bool("expand", false, "expand leading ~ and $HOME in paths and targets")
-	var format *string
-	if cmd == "check" {
-		format = fs.String("format", "manifest", "input format: manifest or script")
-	}
+	format := fs.String("format", defaultFormat, "input format: manifest, script, or stow")
+	target := fs.String("target", "", "stow format only: directory the package's links point into (default: home directory)")
 	fs.Usage = usage
 	fs.Parse(os.Args[2:])
 
@@ -33,29 +36,24 @@ func main() {
 		path = fs.Arg(0)
 	}
 
-	in, err := openInput(path)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "dotlink:", err)
-		os.Exit(1)
-	}
-	defer in.Close()
-
 	var links []Link
 	var convErr error
 
-	switch cmd {
-	case "to-script":
-		links, convErr = parseManifest(in)
-	case "to-manifest":
-		links, convErr = parseScript(in)
-	case "check":
-		switch *format {
-		case "manifest":
-			links, convErr = parseManifest(in)
-		case "script":
-			links, convErr = parseScript(in)
-		default:
-			convErr = fmt.Errorf("unknown -format %q, want manifest or script", *format)
+	if *format == "stow" {
+		links, convErr = readStowInput(path, *target)
+	} else {
+		var in io.ReadCloser
+		in, convErr = openInput(path)
+		if convErr == nil {
+			defer in.Close()
+			switch *format {
+			case "manifest":
+				links, convErr = parseManifest(in)
+			case "script":
+				links, convErr = parseScript(in)
+			default:
+				convErr = fmt.Errorf("unknown -format %q, want manifest, script, or stow", *format)
+			}
 		}
 	}
 
@@ -104,8 +102,9 @@ func openInput(path string) (io.ReadCloser, error) {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: dotlink to-script|to-manifest|check [-expand] [file]")
-	fmt.Fprintln(os.Stderr, "  reads from file, or stdin if omitted or file is -")
+	fmt.Fprintln(os.Stderr, "usage: dotlink to-script|to-manifest|check [-expand] [-format manifest|script|stow] [-target dir] [file]")
+	fmt.Fprintln(os.Stderr, "  reads from file, or stdin if omitted or file is - (not valid with -format stow)")
 	fmt.Fprintln(os.Stderr, "  -expand         expand leading ~ and $HOME in paths and targets")
-	fmt.Fprintln(os.Stderr, "  -format string  check only: input format, manifest or script (default manifest)")
+	fmt.Fprintln(os.Stderr, "  -format string  input format: manifest, script, or stow (default manifest, or script for to-manifest)")
+	fmt.Fprintln(os.Stderr, "  -target string  stow format only: directory the package's links point into (default: home directory)")
 }

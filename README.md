@@ -6,7 +6,7 @@ pile of `ln -sf` lines for another. Every time I move the config
 between machines I end up hand-translating one into the other. This
 converts between them instead.
 
-Two formats:
+Three formats:
 
 **manifest** - a flat text file, one link per line:
 
@@ -25,6 +25,22 @@ ln -sf dotfiles/vim/vimrc ~/.vimrc
 ln -sf dotfiles/zsh/zshrc ~/.zshrc
 ln -sf dotfiles/nvim ~/.config/nvim
 ```
+
+**stow** - a GNU Stow package directory on disk, read directly rather
+than as a text file. Each top-level entry becomes one link into a
+target directory:
+
+```
+dotfiles/
+  .vimrc
+  .config/
+```
+
+read with `-target ~` produces `~/.vimrc = dotfiles/.vimrc` and
+`~/.config = dotfiles/.config`, the same tree-folding stow itself does
+when the target is otherwise empty. This is read-only - dotlink has no
+`to-stow` output, since generating a package directory means moving
+real files around, not just printing text.
 
 ## usage
 
@@ -47,11 +63,21 @@ Check a manifest against what's actually on disk:
 For each entry this reports whether the link path is missing, is a
 regular file or directory instead of a symlink, points somewhere
 other than the expected target, or is a symlink to a target that
-doesn't exist. It exits non-zero if anything is wrong. Pass
-`-format script` to check a script instead of a manifest.
+doesn't exist. It exits non-zero if anything is wrong.
 
-All three subcommands read from stdin when the file argument is
-omitted or is `-`, so pipelines work without a temp file:
+All three subcommands take `-format` to pick the input format:
+`manifest` (the default, `script` for `to-manifest`), `script`, or
+`stow`. With `-format stow` the file argument is a package directory
+instead of a file, and `-target` sets the directory its links point
+into (default: your home directory):
+
+    ./dotlink to-manifest -format stow -target ~ dotfiles/vim > vim.dotlinks
+    ./dotlink check -format stow dotfiles/vim
+
+The manifest and script subcommands read from stdin when the file
+argument is omitted or is `-`, so pipelines work without a temp file
+(this doesn't apply to `-format stow`, which always needs a real
+directory):
 
     cat .dotlinks | ./dotlink to-script
     curl -s https://example.com/setup-links.sh | ./dotlink to-manifest
@@ -83,6 +109,8 @@ last one win.
 
 ## status
 
-Early. Handles the common case, with unit tests for both parsers and
-for `check`. No support for directory-of-links layouts like GNU Stow
-uses.
+Early. Handles the common case, with unit tests for the manifest and
+script parsers, `check`, and the stow reader. Stow support only
+covers the clean-target case - it doesn't unfold a directory that
+already exists for real on the target side, since that decision needs
+to inspect live target state rather than just the package.
