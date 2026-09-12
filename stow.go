@@ -6,21 +6,22 @@ import (
 	"path/filepath"
 )
 
-// parseStowTree reads the top-level entries of a GNU Stow-style package
-// directory and turns each into a Link from targetDir into the package.
+// parseStowTree reads a GNU Stow-style package directory and turns it
+// into Links from targetDir into the package, mirroring stow's own tree
+// folding and unfolding against a live target.
 //
-// This mirrors stow's own behavior against a clean target: as long as
-// nothing already exists at targetDir/name, stow links the whole subtree
-// there in one symlink instead of descending into it (tree folding). It's
-// how the README's own nvim example works - one link for the whole
-// directory rather than one per file inside it.
+// As long as nothing already exists at targetDir/name, stow links the
+// whole subtree there in one symlink instead of descending into it (tree
+// folding). It's how the README's own nvim example works - one link for
+// the whole directory rather than one per file inside it.
 //
-// What this doesn't model is unfolding: real stow will descend into a
-// package subdirectory and link individual files if targetDir/name is
-// already a real directory rather than a symlink, because in that case
-// the single-symlink shortcut would clobber whatever's already there.
-// That decision depends on live state of the target, and this function
-// only reads the package - it doesn't look at the target at all.
+// But if targetDir/name is already a real directory rather than a
+// symlink, folding it would clobber whatever's already there, so stow
+// unfolds instead: it descends into the package subdirectory and links
+// individual entries inside targetDir/name, recursing again at each
+// level. This is why parseStowTree takes a live targetDir rather than
+// just reading the package - the decision depends on what's actually on
+// disk.
 func parseStowTree(pkgDir, targetDir string) ([]Link, error) {
 	entries, err := os.ReadDir(pkgDir)
 	if err != nil {
@@ -32,12 +33,32 @@ func parseStowTree(pkgDir, targetDir string) ([]Link, error) {
 		if name == ".stow-local-ignore" {
 			continue
 		}
-		links = append(links, Link{
-			Path:   filepath.Join(targetDir, name),
-			Target: filepath.Join(pkgDir, name),
-		})
+		pkgPath := filepath.Join(pkgDir, name)
+		targetPath := filepath.Join(targetDir, name)
+
+		if e.IsDir() && targetIsRealDir(targetPath) {
+			sub, err := parseStowTree(pkgPath, targetPath)
+			if err != nil {
+				return nil, err
+			}
+			links = append(links, sub...)
+			continue
+		}
+
+		links = append(links, Link{Path: targetPath, Target: pkgPath})
 	}
 	return links, nil
+}
+
+// targetIsRealDir reports whether targetPath already exists on disk as a
+// directory that isn't itself a symlink - the condition under which stow
+// must unfold rather than fold.
+func targetIsRealDir(targetPath string) bool {
+	info, err := os.Lstat(targetPath)
+	if err != nil {
+		return false
+	}
+	return info.IsDir() && info.Mode()&os.ModeSymlink == 0
 }
 
 // readStowInput resolves the target directory for a stow package and

@@ -38,9 +38,13 @@ dotfiles/
 
 read with `-target ~` produces `~/.vimrc = dotfiles/.vimrc` and
 `~/.config = dotfiles/.config`, the same tree-folding stow itself does
-when the target is otherwise empty. This is read-only - dotlink has no
-`to-stow` output, since generating a package directory means moving
-real files around, not just printing text.
+when the target is otherwise empty. If `~/.config` already exists as a
+real directory rather than a symlink, dotlink unfolds it the same way
+stow does: it descends into `dotfiles/.config` and links its contents
+individually instead, recursing again wherever the target already has
+a real directory. This is read-only - dotlink has no `to-stow` output,
+since generating a package directory means moving real files around,
+not just printing text.
 
 ## usage
 
@@ -110,7 +114,7 @@ last one win.
 ## status
 
 Early. Handles the common case, with unit tests for the manifest and
-script parsers, `check`, and the stow reader. Stow support only
-covers the clean-target case - it doesn't unfold a directory that
-already exists for real on the target side, since that decision needs
-to inspect live target state rather than just the package.
+script parsers, `check`, and the stow reader, including tree folding
+and unfolding against a live target. Still missing: nested stow
+packages and `.stow-local-ignore` patterns beyond the literal
+filename.
