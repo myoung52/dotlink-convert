@@ -42,9 +42,16 @@ when the target is otherwise empty. If `~/.config` already exists as a
 real directory rather than a symlink, dotlink unfolds it the same way
 stow does: it descends into `dotfiles/.config` and links its contents
 individually instead, recursing again wherever the target already has
-a real directory. This is read-only - dotlink has no `to-stow` output,
-since generating a package directory means moving real files around,
-not just printing text.
+a real directory, however deep that nesting goes. This is read-only -
+dotlink has no `to-stow` output, since generating a package directory
+means moving real files around, not just printing text.
+
+A `.stow-local-ignore` file at the package's top level lists patterns
+for entries to skip, one per line, blank lines and `#` comments
+ignored. Patterns are glob patterns matched against each entry's
+basename at any depth in the tree (`*.swp`, `.git`), not the Perl
+regexes real GNU Stow supports - close enough for the usual cases
+without pulling in a regex engine.
 
 ## usage
 
@@ -115,6 +122,6 @@ last one win.
 
 Early. Handles the common case, with unit tests for the manifest and
 script parsers, `check`, and the stow reader, including tree folding
-and unfolding against a live target. Still missing: nested stow
-packages and `.stow-local-ignore` patterns beyond the literal
-filename.
+and unfolding against a live target at arbitrary depth and glob-based
+`.stow-local-ignore` patterns. Still missing: a dry-run report showing
+which package entries would fold vs unfold before touching anything.

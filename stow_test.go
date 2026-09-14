@@ -145,6 +145,73 @@ func TestParseStowTreeUnfoldsNested(t *testing.T) {
 	}
 }
 
+func TestParseStowTreeIgnoresGlobPatterns(t *testing.T) {
+	pkgDir := t.TempDir()
+	targetDir := t.TempDir()
+
+	if err := os.WriteFile(filepath.Join(pkgDir, ".stow-local-ignore"), []byte("*.swp\n# comment\n.git\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(pkgDir, ".vimrc"), []byte("vim config"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(pkgDir, ".vimrc.swp"), []byte("swap"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(pkgDir, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	links, err := parseStowTree(pkgDir, targetDir)
+	if err != nil {
+		t.Fatalf("parseStowTree: %v", err)
+	}
+
+	want := Link{Path: filepath.Join(targetDir, ".vimrc"), Target: filepath.Join(pkgDir, ".vimrc")}
+	if len(links) != 1 || links[0] != want {
+		t.Errorf("parseStowTree() = %+v, want [%+v]", links, want)
+	}
+}
+
+func TestParseStowTreeIgnorePatternAppliesWhenUnfolding(t *testing.T) {
+	pkgDir := t.TempDir()
+	targetDir := t.TempDir()
+
+	if err := os.WriteFile(filepath.Join(pkgDir, ".stow-local-ignore"), []byte("*.orig\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	nested := filepath.Join(pkgDir, ".config")
+	if err := os.Mkdir(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(nested, "init.lua"), []byte("-- init"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(nested, "init.lua.orig"), []byte("-- backup"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// targetDir/.config already exists as a real directory, forcing
+	// unfold, so the top-level ignore pattern must still apply once
+	// parseStowTree recurses into it.
+	if err := os.Mkdir(filepath.Join(targetDir, ".config"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	links, err := parseStowTree(pkgDir, targetDir)
+	if err != nil {
+		t.Fatalf("parseStowTree: %v", err)
+	}
+
+	want := Link{
+		Path:   filepath.Join(targetDir, ".config", "init.lua"),
+		Target: filepath.Join(pkgDir, ".config", "init.lua"),
+	}
+	if len(links) != 1 || links[0] != want {
+		t.Errorf("parseStowTree() = %+v, want [%+v]", links, want)
+	}
+}
+
 func TestParseStowTreeMissingPackage(t *testing.T) {
 	_, err := parseStowTree(filepath.Join(t.TempDir(), "does-not-exist"), t.TempDir())
 	if err == nil {
