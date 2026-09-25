@@ -114,6 +114,19 @@ func targetIsRealDir(targetPath string) bool {
 	return info.IsDir() && info.Mode()&os.ModeSymlink == 0
 }
 
+// resolveTarget applies stow's own default target of the user's home
+// directory whenever -target is left unset.
+func resolveTarget(target string) (string, error) {
+	if target != "" {
+		return target, nil
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("resolving default -target: %w", err)
+	}
+	return home, nil
+}
+
 // readStowInput resolves the target directory for a stow package and
 // reads it. An explicit -target always wins; otherwise it falls back to
 // the user's home directory, matching stow's own default of linking into
@@ -122,12 +135,71 @@ func readStowInput(pkgDir, target string) ([]Link, error) {
 	if pkgDir == "" {
 		return nil, fmt.Errorf("stow format requires a package directory argument, not stdin")
 	}
-	if target == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return nil, fmt.Errorf("resolving default -target: %w", err)
-		}
-		target = home
+	target, err := resolveTarget(target)
+	if err != nil {
+		return nil, err
 	}
 	return parseStowTree(pkgDir, target)
+}
+
+// stowReportEntry is one line of a fold/unfold dry-run report: whether a
+// single package entry would be linked in as a whole (fold) or descended
+// into because the target already holds a real directory there (unfold).
+type stowReportEntry struct {
+	Path   string
+	Action string // "fold" or "unfold"
+}
+
+// stowReport resolves the target the same way readStowInput does and
+// walks the package tree, reporting the fold/unfold decision at every
+// entry instead of the links that decision produces. It's meant to be
+// run before to-script or to-manifest against the same package and
+// target, so an unexpected unfold - say because some other package
+// already created a real directory where this one expected to fold -
+// shows up before anything is written.
+func stowReport(pkgDir, target string) ([]stowReportEntry, error) {
+	if pkgDir == "" {
+		return nil, fmt.Errorf("stow-report requires a package directory argument")
+	}
+	target, err := resolveTarget(target)
+	if err != nil {
+		return nil, err
+	}
+	patterns, err := loadIgnorePatterns(pkgDir)
+	if err != nil {
+		return nil, err
+	}
+	return stowReportTreeIgnoring(pkgDir, target, patterns)
+}
+
+// stowReportTreeIgnoring mirrors parseStowTreeIgnoring's fold/unfold
+// decision at every recursion depth, but records that decision instead
+// of the resulting link.
+func stowReportTreeIgnoring(pkgDir, targetDir string, patterns []string) ([]stowReportEntry, error) {
+	entries, err := os.ReadDir(pkgDir)
+	if err != nil {
+		return nil, fmt.Errorf("reading stow package %s: %w", pkgDir, err)
+	}
+	var report []stowReportEntry
+	for _, e := range entries {
+		name := e.Name()
+		if name == ".stow-local-ignore" || matchesIgnore(name, patterns) {
+			continue
+		}
+		pkgPath := filepath.Join(pkgDir, name)
+		targetPath := filepath.Join(targetDir, name)
+
+		if e.IsDir() && targetIsRealDir(targetPath) {
+			report = append(report, stowReportEntry{Path: targetPath, Action: "unfold"})
+			sub, err := stowReportTreeIgnoring(pkgPath, targetPath, patterns)
+			if err != nil {
+				return nil, err
+			}
+			report = append(report, sub...)
+			continue
+		}
+
+		report = append(report, stowReportEntry{Path: targetPath, Action: "fold"})
+	}
+	return report, nil
 }

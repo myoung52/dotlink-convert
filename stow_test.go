@@ -226,6 +226,56 @@ func TestReadStowInputRequiresPackageDir(t *testing.T) {
 	}
 }
 
+func TestStowReport(t *testing.T) {
+	pkgDir := t.TempDir()
+	targetDir := t.TempDir()
+
+	// .vimrc has nothing at targetDir/.vimrc, so it folds. .config
+	// already exists as a real directory at the target, so it must
+	// unfold, and its own children are reported in turn.
+	if err := os.WriteFile(filepath.Join(pkgDir, ".vimrc"), []byte("vim config"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	nested := filepath.Join(pkgDir, ".config")
+	if err := os.Mkdir(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(nested, "nvim.conf"), []byte("config"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(filepath.Join(targetDir, ".config"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	report, err := stowReport(pkgDir, targetDir)
+	if err != nil {
+		t.Fatalf("stowReport: %v", err)
+	}
+
+	sort.Slice(report, func(i, j int) bool { return report[i].Path < report[j].Path })
+
+	want := []stowReportEntry{
+		{Path: filepath.Join(targetDir, ".config"), Action: "unfold"},
+		{Path: filepath.Join(targetDir, ".config", "nvim.conf"), Action: "fold"},
+		{Path: filepath.Join(targetDir, ".vimrc"), Action: "fold"},
+	}
+	if len(report) != len(want) {
+		t.Fatalf("stowReport() = %+v, want %+v", report, want)
+	}
+	for i := range want {
+		if report[i] != want[i] {
+			t.Errorf("entry %d = %+v, want %+v", i, report[i], want[i])
+		}
+	}
+}
+
+func TestStowReportRequiresPackageDir(t *testing.T) {
+	_, err := stowReport("", "")
+	if err == nil {
+		t.Fatal("stowReport(\"\", \"\") = nil error, want error")
+	}
+}
+
 func TestReadStowInputExplicitTarget(t *testing.T) {
 	pkgDir := t.TempDir()
 	targetDir := t.TempDir()

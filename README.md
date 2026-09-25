@@ -85,6 +85,25 @@ into (default: your home directory):
     ./dotlink to-manifest -format stow -target ~ dotfiles/vim > vim.dotlinks
     ./dotlink check -format stow dotfiles/vim
 
+A fourth subcommand, `stow-report`, is a dry run over a stow package
+that never touches the manifest/script/link machinery at all - it just
+prints, for every entry in the package, whether it would fold into a
+single symlink or unfold because the target already has a real
+directory there:
+
+    ./dotlink stow-report -target ~ dotfiles/vim
+
+```
+fold   /home/you/.vimrc
+unfold /home/you/.config
+fold   /home/you/.config/nvim.conf
+```
+
+Useful before running `to-script -format stow` against the same
+package and target, to catch an unexpected unfold - say because some
+other package already created a real directory where this one expected
+to fold - before anything is written.
+
 The manifest and script subcommands read from stdin when the file
 argument is omitted or is `-`, so pipelines work without a temp file
 (this doesn't apply to `-format stow`, which always needs a real
@@ -121,7 +140,6 @@ last one win.
 ## status
 
 Early. Handles the common case, with unit tests for the manifest and
-script parsers, `check`, and the stow reader, including tree folding
-and unfolding against a live target at arbitrary depth and glob-based
-`.stow-local-ignore` patterns. Still missing: a dry-run report showing
-which package entries would fold vs unfold before touching anything.
+script parsers, `check`, `stow-report`, and the stow reader, including
+tree folding and unfolding against a live target at arbitrary depth and
+glob-based `.stow-local-ignore` patterns.

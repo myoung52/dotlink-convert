@@ -90,3 +90,21 @@ func TestWriteCheckReport(t *testing.T) {
 		t.Error("writeCheckReport() = false, want true when every link is ok")
 	}
 }
+
+func TestWriteStowReport(t *testing.T) {
+	report := []stowReportEntry{
+		{Path: "/home/.vimrc", Action: "fold"},
+		{Path: "/home/.config", Action: "unfold"},
+		{Path: "/home/.config/nvim.conf", Action: "fold"},
+	}
+
+	var buf bytes.Buffer
+	if err := writeStowReport(&buf, report); err != nil {
+		t.Fatalf("writeStowReport: %v", err)
+	}
+
+	want := "fold   /home/.vimrc\nunfold /home/.config\nfold   /home/.config/nvim.conf\n"
+	if buf.String() != want {
+		t.Errorf("writeStowReport() = %q, want %q", buf.String(), want)
+	}
+}

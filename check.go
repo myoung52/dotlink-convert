@@ -85,3 +85,15 @@ func writeCheckReport(w io.Writer, results []checkResult) bool {
 	}
 	return allOK
 }
+
+// writeStowReport prints one line per package entry, in tree order, with
+// the same fold/unfold decision parseStowTree would apply against the
+// same package directory and target.
+func writeStowReport(w io.Writer, report []stowReportEntry) error {
+	for _, r := range report {
+		if _, err := fmt.Fprintf(w, "%-6s %s\n", r.Action, r.Path); err != nil {
+			return err
+		}
+	}
+	return nil
+}

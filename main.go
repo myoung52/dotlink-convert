@@ -14,9 +14,14 @@ func main() {
 	}
 
 	cmd := os.Args[1]
-	if cmd != "to-script" && cmd != "to-manifest" && cmd != "check" {
+	if cmd != "to-script" && cmd != "to-manifest" && cmd != "check" && cmd != "stow-report" {
 		usage()
 		os.Exit(2)
+	}
+
+	if cmd == "stow-report" {
+		runStowReport(os.Args[2:])
+		return
 	}
 
 	defaultFormat := "manifest"
@@ -82,6 +87,31 @@ func main() {
 	}
 }
 
+// runStowReport handles the stow-report subcommand, which always reads
+// a stow package directory - there's no -format or -expand to choose
+// between, since it reports fold/unfold decisions rather than links.
+func runStowReport(args []string) {
+	fs := flag.NewFlagSet("stow-report", flag.ExitOnError)
+	target := fs.String("target", "", "directory the package's links point into (default: home directory)")
+	fs.Usage = usage
+	fs.Parse(args)
+
+	var path string
+	if fs.NArg() > 0 {
+		path = fs.Arg(0)
+	}
+
+	report, err := stowReport(path, *target)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "dotlink:", err)
+		os.Exit(1)
+	}
+	if err := writeStowReport(os.Stdout, report); err != nil {
+		fmt.Fprintln(os.Stderr, "dotlink:", err)
+		os.Exit(1)
+	}
+}
+
 // expandLinks rewrites every path and target in place using expandPath.
 func expandLinks(links []Link) {
 	for i := range links {
@@ -103,8 +133,11 @@ func openInput(path string) (io.ReadCloser, error) {
 
 func usage() {
 	fmt.Fprintln(os.Stderr, "usage: dotlink to-script|to-manifest|check [-expand] [-format manifest|script|stow] [-target dir] [file]")
+	fmt.Fprintln(os.Stderr, "       dotlink stow-report [-target dir] pkgdir")
 	fmt.Fprintln(os.Stderr, "  reads from file, or stdin if omitted or file is - (not valid with -format stow)")
 	fmt.Fprintln(os.Stderr, "  -expand         expand leading ~ and $HOME in paths and targets")
 	fmt.Fprintln(os.Stderr, "  -format string  input format: manifest, script, or stow (default manifest, or script for to-manifest)")
 	fmt.Fprintln(os.Stderr, "  -target string  stow format only: directory the package's links point into (default: home directory)")
+	fmt.Fprintln(os.Stderr, "  stow-report prints, for every entry in a stow package, whether it would")
+	fmt.Fprintln(os.Stderr, "  fold into one symlink or unfold because the target already has a real directory there")
 }
